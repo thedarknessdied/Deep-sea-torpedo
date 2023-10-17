@@ -81,7 +81,3 @@ class ProduceRandomValue(object):
 
     def create_random_variable_length(self) -> int:
         return random.randint(self.__MIN_VARIABLE_CNT, self.__MAX_VARIABLE_CNT)
-
-
-o = BaseUtils()
-print(o.create_random_variable_name(o.create_random_variable_length(), special_symbols="@"))
