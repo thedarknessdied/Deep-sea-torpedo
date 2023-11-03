@@ -2,75 +2,35 @@ import re
 
 
 class WebProxy(object):
+    """
+        WebProxy用来构造一个适用于HTTP/HTTPS请求的服务代理
+        ================================================================
+        url(required): 完整的代理UTL请求地址
+        protocol: 代理URL所使用的协议(HTTP/HTTPS/SOCKS4/SOCKS5)
+        username: 代理URL身份验证用户名
+        password: 代理URL身份验证密码
+        hostname: 代理URL请求地址
+        port: 代理URL请求端口
+        auth: 代理URL是否需要身份验证
+        is_active: 代理URL是否处于开启状态(只有处于活跃状态的代理才能够进行任务)
+        is_usable: 代理URL是否合法、合规
+    """
+    __slots__ = ('url', 'protocol', 'username', 'password', 'hostname', 'port', 'auth',
+                 'is_active', 'is_usable')
+
     from utils.default import HTTP_REQUEST_PROXY_PROTOCOL
     # web端请求数据使用代理时允许使用的代理协议类型
     HTTP_REQUEST_PROXY_PROTOCOL = HTTP_REQUEST_PROXY_PROTOCOL
     # 构建代理 URL 所需要的参数名称
     PARAM_NAME = ['protocol', 'authorize', 'hostname', 'port']
 
-    def __init__(self, *args, **kwargs):
-        self.is_usable = False
-        if args is None or not args:
-            ''' 将字典转化为代理IP字符串(组合) '''
-            self.protocol = self._get_str_from_dict('protocol', kwargs, str, "")
-            self.hostname = self._get_str_from_dict('hostname', kwargs, str, "")
-            self.port = self._get_str_from_dict('port', kwargs, str, "")
-            self.username = self._get_str_from_dict('username', kwargs, str, "")
-            self.password = self._get_str_from_dict('password', kwargs, str, "")
-            self.auth = self._get_str_from_dict('auth', kwargs, bool, False)
-            self.url = self._set_url()
-            self._check_proxy_url()
-        else:
-            ''' 将字符串转化为代理IP字符串(拆分) '''
-            self.url = args[0] if len(args) >= 1 else ""
-            self.protocol, self.hostname, self.port, self.username, self.password, self.auth = self._parse_str2param()
-
-    @classmethod
-    def _get_str_from_dict(cls, o: str, data: dict, _type: any, _default: any):
-        """
-            从对应的data字典中查找o字段的内容
-            如果查询不到内容或是内容类型不是 _type 对应的类型，那么返回对应的_default那日容
-        :param o: 需要从字段中获取的字段
-        :param data: 查询字典
-        :param _type: 期待返回的数据类型
-        :param _default: 期待返回的数据的默认值
-        :return: 字典中对应的数据
-        """
-        ''' 期待返回数据类型和默认数值不匹配 '''
-        if not isinstance(_default, _type):
-            ''' [*] 此处应产生警告日志(数据类型和值不匹配) '''
-            _type = str
-            _default = ""
-
-        _data = data.get(o, None)
-        if _data is None:
-            return _default
-        if not isinstance(_data, _type):
-            return _default
-        return _data
-
-    def _set_authorized(self) -> str:
-        """
-            判断是否需要身份验证，构造身份验证信息
-        :return: 身份验证消息
-        """
-        """ 通过判断是否需要身份验证，构造身份验证信息 """
-        if self.auth:
-            _authorize = f"{self.username}:{self.password}@"
-        elif self.username is not None and self.password is not None and (self.username or self.password):
-            self.auth = True
-            _authorize = f"{self.username if self.username else ''}:{self.password if self.password else ''}@"
-        else:
-            _authorize = ""
-        return _authorize
-
-    def _set_url(self) -> str:
-        """
-            构建代理URL
-        :return: 代理URL
-        """
-        _authorized = self._set_authorized()
-        return f"{self.protocol}://{_authorized}{self.hostname}:{self.port}"
+    def __init__(self, url: str):
+        self.is_active = False
+        self.is_usable = True
+        self.url = url
+        self.protocol, self.hostname, self.port, self.username, self.password, self.auth = self._parse_str2param()
+        ''' 根据分析结果修正url属性 '''
+        self.url = self._set_url()
 
     @classmethod
     def _get_proxy_mode(cls) -> re.Pattern:
@@ -137,7 +97,30 @@ class WebProxy(object):
             else:
                 _is_auth = True
                 self.is_usable = True
-        return protocol, username, password, hostname, port, _is_auth
+        return protocol, hostname, port, username, password, _is_auth
+
+    def _set_authorized(self) -> str:
+        """
+            判断是否需要身份验证，构造身份验证信息
+        :return: 身份验证消息
+        """
+        """ 通过判断是否需要身份验证，构造身份验证信息 """
+        if self.auth:
+            _authorize = f"{self.username}:{self.password}@"
+        elif self.username is not None and self.password is not None and (self.username or self.password):
+            self.auth = True
+            _authorize = f"{self.username if self.username else ''}:{self.password if self.password else ''}@"
+        else:
+            _authorize = ""
+        return _authorize
+
+    def _set_url(self) -> str:
+        """
+            构建代理URL
+        :return: 代理URL
+        """
+        _authorized = self._set_authorized()
+        return f"{self.protocol}://{_authorized}{self.hostname}:{self.port}"
 
     def test_proxy_alive(self, url: str, try_times: int = 5) -> (bool, str):
         """
@@ -152,11 +135,8 @@ class WebProxy(object):
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
         try:
-            print(url, self.protocol, self.url)
-            headers = {
-                "User-Agent": """Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36"""
-            }
-            _ = requests.get(url=url, proxies={f"{self.protocol}": self.url}, timeout=(5, 10), verify=False, headers=headers)
+            _ = requests.get(url=url, proxies={f"{self.protocol}": self.url}, timeout=(5, 10), verify=False)
+            self.is_usable = True
             return True, "[+]代理能够使用..."
         except requests.exceptions.ConnectTimeout:
             if try_times > 0:
@@ -174,3 +154,6 @@ class WebProxy(object):
         except Exception as e:
             self.is_usable = False
             return False, f'[!]代理访问出现异常...'
+
+    def switch_active(self):
+        return not self.is_active
