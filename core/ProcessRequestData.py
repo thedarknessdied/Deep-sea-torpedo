@@ -180,7 +180,9 @@ class WebRequestsData(object):
         return {
             'line': _requests_line,
             'header': _requests_headers,
-            'data': _requests_data
+            'data': _requests_data,
+            'protocol': self.protocol,
+            'data_type': self.data_type
         }
 
     def _check_requests_package(self):

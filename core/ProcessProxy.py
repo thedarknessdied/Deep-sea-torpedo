@@ -202,7 +202,8 @@ class WebProxy(object):
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
         try:
-            _ = requests.get(url=url, proxies={f"{self._url_list['protocol']}": url}, timeout=(5, 10), verify=False)
+            _ = requests.get(url=url, proxies=self.show_proxy(),
+                             timeout=(5, 10), verify=False)
             self._is_usable = True
             return True, "[+]代理能够使用..."
         except requests.exceptions.ConnectTimeout:
@@ -221,3 +222,6 @@ class WebProxy(object):
         except Exception:
             self._is_usable = False
             return False, f'[!]代理访问出现异常...'
+
+    def show_proxy(self) -> dict:
+        return {f"{self._url_list['protocol']}": self._url}
